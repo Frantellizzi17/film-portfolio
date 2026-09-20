@@ -532,6 +532,30 @@ function SiteFooter() {
 
 function AppContent() {
   useHashScroll();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openSection, setOpenSection] = useState<'trips' | 'albums' | 'cameras' | 'about' | null>(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setOpenSection(null);
+  }, [location.pathname, location.hash]);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  const toggleSection = (section: 'trips' | 'albums' | 'cameras' | 'about') => {
+    setOpenSection(prev => prev === section ? null : section);
+  };
+
   return (
     <>
       <ScrollToTop />
@@ -541,7 +565,8 @@ function AppContent() {
           <p className="site-subtitle">Peter Frantellizzi's Photography Portfolio</p>
         </div>
         <header className="header">
-          <nav className="nav">
+          {/* Desktop Navigation */}
+          <nav className="nav desktop-nav">
             <Link to="/" className="nav-link">Home</Link>
             <div className="nav-dropdown">
               <span className="nav-link">Trips</span>
@@ -592,7 +617,170 @@ function AppContent() {
               </div>
             </div>
           </nav>
+
+          {/* Mobile Menu Toggle Button */}
+          <button 
+            className="mobile-menu-toggle"
+            onClick={() => setMobileMenuOpen(prev => !prev)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            <span className={`hamburger-line ${mobileMenuOpen ? 'open' : ''}`}></span>
+            <span className={`hamburger-line ${mobileMenuOpen ? 'open' : ''}`}></span>
+            <span className={`hamburger-line ${mobileMenuOpen ? 'open' : ''}`}></span>
+          </button>
         </header>
+
+        {/* Mobile Navigation Drawer Overlay */}
+        <div 
+          className={`mobile-nav-overlay ${mobileMenuOpen ? 'active' : ''}`}
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div 
+            className="mobile-nav-drawer"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="mobile-nav-header">
+              <span className="mobile-nav-title">Menu</span>
+              <button 
+                className="mobile-nav-close"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
+              >
+                &times;
+              </button>
+            </div>
+
+            <nav className="mobile-nav-list">
+              <Link to="/" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>
+                Home
+              </Link>
+
+              <div className="mobile-nav-accordion">
+                <button 
+                  className="mobile-accordion-toggle"
+                  onClick={() => toggleSection('trips')}
+                >
+                  <span>Trips ({TRIPS.length})</span>
+                  <span className={`accordion-icon ${openSection === 'trips' ? 'open' : ''}`}>▾</span>
+                </button>
+                {openSection === 'trips' && (
+                  <div className="mobile-accordion-content">
+                    {TRIPS.map(item => (
+                      <Link 
+                        key={item.id} 
+                        to={`/item/${item.id}`} 
+                        className="mobile-accordion-link"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {item.title}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mobile-nav-accordion">
+                <button 
+                  className="mobile-accordion-toggle"
+                  onClick={() => toggleSection('albums')}
+                >
+                  <span>Albums ({ALBUMS.length})</span>
+                  <span className={`accordion-icon ${openSection === 'albums' ? 'open' : ''}`}>▾</span>
+                </button>
+                {openSection === 'albums' && (
+                  <div className="mobile-accordion-content">
+                    {ALBUMS.map(item => (
+                      <Link 
+                        key={item.id} 
+                        to={`/item/${item.id}`} 
+                        className="mobile-accordion-link"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {item.title}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mobile-nav-accordion">
+                <button 
+                  className="mobile-accordion-toggle"
+                  onClick={() => toggleSection('cameras')}
+                >
+                  <span>Cameras</span>
+                  <span className={`accordion-icon ${openSection === 'cameras' ? 'open' : ''}`}>▾</span>
+                </button>
+                {openSection === 'cameras' && (
+                  <div className="mobile-accordion-content">
+                    <Link 
+                      to="/cameras" 
+                      className="mobile-accordion-link mobile-accordion-overview"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      All Equipment Overview &rarr;
+                    </Link>
+                    <div className="mobile-sub-group">
+                      <span className="mobile-sub-header">Film</span>
+                      {FILM_CAMERAS.map(camera => (
+                        <Link 
+                          key={camera.id} 
+                          to={`/camera/${camera.id}`} 
+                          className="mobile-accordion-link"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {camera.name}
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="mobile-sub-group">
+                      <span className="mobile-sub-header">Digital</span>
+                      {DIGITAL_CAMERAS.map(camera => (
+                        <Link 
+                          key={camera.id} 
+                          to={`/camera/${camera.id}`} 
+                          className="mobile-accordion-link"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {camera.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mobile-nav-accordion">
+                <button 
+                  className="mobile-accordion-toggle"
+                  onClick={() => toggleSection('about')}
+                >
+                  <span>About</span>
+                  <span className={`accordion-icon ${openSection === 'about' ? 'open' : ''}`}>▾</span>
+                </button>
+                {openSection === 'about' && (
+                  <div className="mobile-accordion-content">
+                    <Link 
+                      to="/about" 
+                      className="mobile-accordion-link"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      About Me
+                    </Link>
+                    <Link 
+                      to="/about#contact" 
+                      className="mobile-accordion-link"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Get In Touch
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </nav>
+          </div>
+        </div>
 
         <Routes>
           <Route path="/" element={<Home />} />
