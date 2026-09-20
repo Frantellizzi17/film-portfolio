@@ -195,21 +195,25 @@ function ContactForm() {
     e.preventDefault();
     setStatus('sending');
 
-    const formData = new FormData();
-    formData.append('email', email);
-    formData.append('message', message);
-    formData.append('_subject', 'New Portfolio Inquiry');
-
     try {
-      const response = await fetch('https://formspree.io/Frantellizzi17@gmail.com', {
+      const response = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
-        body: formData,
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        body: JSON.stringify({
+          access_key: '53df396c-6bc4-43ee-b5e2-b1255eb3f94b',
+          subject: 'New Portfolio Inquiry',
+          from_name: 'Aperture Priority Contact Form',
+          email,
+          message,
+        })
       });
 
-      if (response.ok) {
+      const data = await response.json();
+
+      if (data.success) {
         setStatus('success');
         setEmail('');
         setMessage('');
