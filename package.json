@@ -6,7 +6,7 @@
   "scripts": {
     "sync": "node generate-trips.js",
     "dev": "npm run sync && vite",
-    "build": "npm run sync && tsc -b && vite build",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

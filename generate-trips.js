@@ -79,18 +79,15 @@ const ingestFromPublic = () => {
   for (const entry of entries) {
     if (entry.isDirectory()) {
       const pubFolder = path.join(PUBLIC_PHOTOS_DIR, entry.name);
-      const srcFolder = path.join(SOURCE_DIR, entry.name);
-      if (!fs.existsSync(srcFolder)) fs.mkdirSync(srcFolder, { recursive: true });
-
       const files = fs.readdirSync(pubFolder);
-      for (const file of files) {
-        if (/\.(jpe?g|png)$/i.test(file)) {
-          const srcFilePath = path.join(srcFolder, file);
-          const pubFilePath = path.join(pubFolder, file);
-          if (!fs.existsSync(srcFilePath)) {
-            fs.copyFileSync(pubFilePath, srcFilePath);
-          }
-        } else if (/\.(rtf|txt)$/i.test(file)) {
+      const rawFiles = files.filter(f => /\.(jpe?g|png)$/i.test(f));
+      
+      // Only ingest if raw files exist
+      if (rawFiles.length > 0) {
+        const srcFolder = path.join(SOURCE_DIR, entry.name);
+        if (!fs.existsSync(srcFolder)) fs.mkdirSync(srcFolder, { recursive: true });
+
+        for (const file of files) {
           const srcFilePath = path.join(srcFolder, file);
           const pubFilePath = path.join(pubFolder, file);
           if (!fs.existsSync(srcFilePath)) {
@@ -107,15 +104,17 @@ const optimizeImage = async (srcPath, destPath) => {
   const destDir = path.dirname(destPath);
   if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
 
-  const srcStat = fs.statSync(srcPath);
-  const destExists = fs.existsSync(destPath);
+  if (path.resolve(srcPath) !== path.resolve(destPath)) {
+    const srcStat = fs.statSync(srcPath);
+    const destExists = fs.existsSync(destPath);
 
-  if (!destExists || fs.statSync(destPath).mtimeMs < srcStat.mtimeMs) {
-    await sharp(srcPath)
-      .rotate()
-      .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: WEBP_QUALITY })
-      .toFile(destPath);
+    if (!destExists || fs.statSync(destPath).mtimeMs < srcStat.mtimeMs) {
+      await sharp(srcPath)
+        .rotate()
+        .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: WEBP_QUALITY })
+        .toFile(destPath);
+    }
   }
 
   const meta = await sharp(destPath).metadata();
@@ -147,7 +146,6 @@ const optimizeStaticAssets = async () => {
 
       await optimizeImage(srcFile, destWebpFile);
 
-      // Clean raw uncompressed counterpart from public if exists
       if (ext.toLowerCase() !== '.webp') {
         const rawInPub = path.join(dest, file);
         if (fs.existsSync(rawInPub)) fs.unlinkSync(rawInPub);
@@ -160,13 +158,15 @@ const processTrips = async () => {
   ingestFromPublic();
   await optimizeStaticAssets();
 
-  // If 0 - Archive exists in public, remove it to save dist bundle size (it is preserved in photos_source)
   const pubArchive = path.join(PUBLIC_PHOTOS_DIR, '0 - Archive');
   if (fs.existsSync(pubArchive)) {
     fs.rmSync(pubArchive, { recursive: true, force: true });
   }
 
-  const sourceBase = fs.existsSync(SOURCE_DIR) ? SOURCE_DIR : PUBLIC_PHOTOS_DIR;
+  const hasSourcePhotos = fs.existsSync(SOURCE_DIR) && 
+    fs.readdirSync(SOURCE_DIR).some(f => !f.startsWith('.') && fs.statSync(path.join(SOURCE_DIR, f)).isDirectory());
+
+  const sourceBase = hasSourcePhotos ? SOURCE_DIR : PUBLIC_PHOTOS_DIR;
   const folders = fs.readdirSync(sourceBase, { withFileTypes: true })
     .filter(dirent => dirent.isDirectory() && !dirent.name.startsWith('0 -'))
     .map(dirent => dirent.name);
@@ -181,7 +181,6 @@ const processTrips = async () => {
     const info = parseInfo(srcFolder);
     const id = folderName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    // Copy any info RTF/TXT to public folder for completeness
     const infoFiles = fs.readdirSync(srcFolder).filter(f => /\.(rtf|txt)$/i.test(f));
     for (const infoFile of infoFiles) {
       const destInfo = path.join(pubFolder, infoFile);
@@ -200,7 +199,6 @@ const processTrips = async () => {
 
       const { orientation } = await optimizeImage(srcPhotoPath, destWebpPath);
 
-      // Clean up raw jpg/png from public if present
       if (ext.toLowerCase() !== '.webp') {
         const rawPubPhoto = path.join(pubFolder, file);
         if (fs.existsSync(rawPubPhoto)) fs.unlinkSync(rawPubPhoto);
@@ -220,7 +218,6 @@ const processTrips = async () => {
       });
     }
 
-    // Sort photos: first_ prefix, then landscape, then portrait
     const sortedPhotos = [...photos].sort((a, b) => {
       if (a.isFirst && !b.isFirst) return -1;
       if (!a.isFirst && b.isFirst) return 1;
@@ -252,9 +249,13 @@ const processTrips = async () => {
     });
   }
 
-  items.sort((a, b) => b._timestamp - a._timestamp);
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(items, null, 2));
-  console.log(`Successfully optimized and generated ${items.length} items to WebP format.`);
+  if (items.length > 0) {
+    items.sort((a, b) => b._timestamp - a._timestamp);
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(items, null, 2));
+    console.log(`Successfully generated ${items.length} items to WebP format.`);
+  } else {
+    console.log('No folders found to process, preserving existing trips.json.');
+  }
 };
 
 processTrips().catch(err => {
